@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="auto">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skills Explorer</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="app" x-data="skillsApp()" x-init="init()">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        <span class="logo-title">Skills</span>
+      </div>
+      <div class="header-actions">
+        <div class="lang-toggle" :title="t('language')">
+          <button :class="{active: settings.language === 'auto'}" @click="setLanguage('auto')">A</button>
+          <button :class="{active: settings.language === 'zh'}" @click="setLanguage('zh')">中</button>
+          <button :class="{active: settings.language === 'en'}" @click="setLanguage('en')">En</button>
+        </div>
+        <button class="theme-toggle" @click="toggleTheme()" title="Toggle theme">
+        <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+        </svg>
+        <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="search-box">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon">
+        <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="text" x-ref="searchInput" x-model="search" :placeholder="t('search')" autocomplete="off" spellcheck="false">
+      <span class="search-count" x-text="filteredSkills.length"></span>
+    </div>
+
+    <!-- Filter: Status (capsule group) -->
+    <div class="filter-group">
+      <span class="filter-group-label" x-text="t('status')"></span>
+      <div class="capsule-group">
+        <template x-for="f in filters" :key="f.key">
+          <button class="capsule" :class="{active: currentFilter === f.key}" @click="currentFilter = f.key" x-text="f.key === 'fav' ? '★' : t(f.key === 'package' ? 'packages' : f.key)"></button>
+        </template>
+      </div>
+    </div>
+
+    <!-- Filter: Source (capsule group) -->
+    <div class="filter-group">
+      <span class="filter-group-label" x-text="t('source')"></span>
+      <div class="capsule-group">
+        <button class="capsule" :class="{active: sourceFilter === ''}" @click="sourceFilter = ''" x-text="t('all')"></button>
+        <button class="capsule" :class="{active: sourceFilter === 'auto'}" @click="sourceFilter = 'auto'">Auto</button>
+        <button class="capsule" :class="{active: sourceFilter === 'agent'}" @click="sourceFilter = 'agent'">Agent</button>
+        <button class="capsule" :class="{active: sourceFilter === 'git'}" @click="sourceFilter = 'git'">Git</button>
+        <button class="capsule" :class="{active: sourceFilter === 'npm'}" @click="sourceFilter = 'npm'">NPM</button>
+      </div>
+    </div>
+
+    <!-- Filter: Scope (capsule group) -->
+    <div class="filter-group">
+      <span class="filter-group-label" x-text="t('scope')"></span>
+      <div class="capsule-group">
+        <button class="capsule" :class="{active: scopeFilter === ''}" @click="scopeFilter = ''" x-text="t('all')"></button>
+        <button class="capsule" :class="{active: scopeFilter === 'user'}" @click="scopeFilter = 'user'" x-text="t('user')"></button>
+        <button class="capsule" :class="{active: scopeFilter === 'project'}" @click="scopeFilter = 'project'" x-text="t('project')"></button>
+      </div>
+    </div>
+
+    <!-- Filter: Agent (custom dropdown) -->
+    <div class="filter-group">
+      <span class="filter-group-label" x-text="t('agent')"></span>
+      <div class="custom-dropdown" @click.away="agentDropdownOpen = false">
+        <button class="dropdown-trigger" @click="agentDropdownOpen = !agentDropdownOpen">
+          <span x-text="agentFilter ? agentFilter : t('allAgents')"></span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="dropdown-menu" x-show="agentDropdownOpen" x-cloak>
+          <button class="dropdown-item" :class="{active: agentFilter === ''}" @click="agentFilter = ''; agentDropdownOpen = false" x-text="t('allAgents')"></button>
+          <template x-for="ag in agentList" :key="ag">
+            <button class="dropdown-item" :class="{active: agentFilter === ag}" @click="agentFilter = ag; agentDropdownOpen = false" x-text="ag"></button>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <div class="skill-list">
+      <template x-if="loading">
+        <div class="loading-state"><div class="spinner"></div><span x-text="t('loadingSkills')"></span></div>
+      </template>
+      <template x-if="!loading && filteredSkills.length === 0">
+        <div class="loading-state"><span x-text="t('noMatchingSkills')"></span></div>
+      </template>
+      <template x-for="s in filteredSkills" :key="s.name">
+        <div class="skill-item" :class="{disabled: !s.enabled, active: selectedName === s.name}" @click="selectSkill(s.name)">
+          <div class="skill-dot" x-text="s.name.charAt(0).toUpperCase()"></div>
+          <div class="skill-item-body">
+            <div class="skill-item-name">
+              <span x-text="s.name"></span>
+              <button class="fav-star" :class="{active: isFavorite(s.name)}" @click.stop="toggleFavorite(s.name)" title="Toggle favorite">★</button>
+            </div>
+            <div class="skill-item-desc" x-text="truncate(s.description, 50)"></div>
+            <div class="skill-item-meta">
+              <template x-if="isFavorite(s.name)"><span class="badge badge-fav">★</span></template>
+              <template x-if="s.origin === 'package'"><span class="badge badge-package">pkg</span></template>
+              <template x-if="s.origin !== 'package' && s.source === 'auto'"><span class="badge badge-auto">auto</span></template>
+              <template x-if="s.source === 'agent'"><span class="badge badge-agent" x-text="s.agent || 'agent'"></span></template>
+              <template x-if="s.scope === 'user'"><span class="badge badge-user">user</span></template>
+              <template x-if="s.scope === 'project'"><span class="badge badge-project">proj</span></template>
+              <template x-if="!s.enabled"><span class="badge badge-off">off</span></template>
+              <template x-if="s.isSymlink"><span class="badge badge-link">link</span></template>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div class="sidebar-footer">
+      <span><span class="stat" x-text="total"></span> <span x-text="t('skills')"></span></span>
+      <span><span class="stat" style="color:var(--green)" x-text="enabledCount"></span> <span x-text="t('on')"></span></span>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ────────────────────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- Dashboard (default home) -->
+    <div class="dashboard" x-show="!selected && !detailLoading">
+      <div class="dash-header">
+        <h1 class="dash-title" x-text="t('title')"></h1>
+        <p class="dash-subtitle" x-text="t('subtitle')"></p>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-card-value" x-text="total"></div>
+          <div class="stat-card-label" x-text="t('totalSkills')"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-value" style="color:var(--green)" x-text="enabledCount"></div>
+          <div class="stat-card-label" x-text="t('enabled')"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-value" style="color:var(--red)" x-text="total - enabledCount"></div>
+          <div class="stat-card-label" x-text="t('disabled')"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-value" style="color:var(--amber)" x-text="favCount"></div>
+          <div class="stat-card-label" x-text="t('favorites')"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-value" style="color:var(--blue)" x-text="agentList.length"></div>
+          <div class="stat-card-label" x-text="t('agents')"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-value" style="color:var(--text)" x-text="totalUsage"></div>
+          <div class="stat-card-label" x-text="t('reads')"></div>
+        </div>
+      </div>
+
+      <div class="settings-strip">
+        <button class="setting-pill" :class="{active: settings.usageTrackingEnabled}" @click="toggleUsageTracking()">
+          <span x-text="t('usageTracking')"></span>
+          <strong x-text="settings.usageTrackingEnabled ? 'ON' : 'OFF'"></strong>
+        </button>
+      </div>
+
+      <!-- Source breakdown -->
+      <div class="dash-section">
+        <h2 class="dash-section-title" x-text="t('bySource')"></h2>
+        <div class="bar-chart">
+          <template x-for="row in sourceBreakdown" :key="row.key">
+            <div class="bar-row">
+              <div class="bar-label" x-text="row.label"></div>
+              <div class="bar-track">
+                <div class="bar-fill" :style="'width:' + row.percent + '%; background:' + row.color" x-text="row.count"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Usage breakdown -->
+      <div class="dash-section" x-show="topUsedSkills.length > 0">
+        <h2 class="dash-section-title" x-text="t('topUsed')"></h2>
+        <div class="usage-list">
+          <template x-for="s in topUsedSkills" :key="s.name">
+            <div class="usage-row" @click="selectSkill(s.name)">
+              <span class="usage-name" x-text="s.name"></span>
+              <span class="usage-count" x-text="s.usageCount"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Agent breakdown -->
+      <div class="dash-section" x-show="agentBreakdown.length > 0">
+        <h2 class="dash-section-title" x-text="t('byAgent')"></h2>
+        <div class="agent-grid">
+          <template x-for="ag in agentBreakdown" :key="ag.agent">
+            <div class="agent-card" @click="agentFilter = ag.agent; selectFirstSkill()">
+              <div class="agent-card-name" x-text="ag.agent"></div>
+              <div class="agent-card-count" x-text="ag.count"></div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Recent skills gallery -->
+      <div class="dash-section">
+        <h2 class="dash-section-title" x-text="t('enabledSkills')"></h2>
+        <div class="gallery-grid">
+          <template x-for="s in gallerySkills" :key="s.name">
+            <div class="gallery-card" @click="selectSkill(s.name)">
+              <div class="gallery-dot" x-text="s.name.charAt(0).toUpperCase()"></div>
+              <div class="gallery-info">
+                <div class="gallery-name" x-text="s.name"></div>
+                <div class="gallery-desc" x-text="truncate(s.description, 40)"></div>
+                <div class="gallery-meta">
+                  <template x-if="s.source === 'agent'"><span class="badge badge-agent" x-text="s.agent || 'agent'"></span></template>
+                  <template x-if="s.source === 'auto'"><span class="badge badge-auto">auto</span></template>
+                  <template x-if="s.origin === 'package'"><span class="badge badge-package">pkg</span></template>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading state -->
+    <div class="loading-state" x-show="detailLoading" style="min-height:360px">
+      <div class="spinner"></div><span x-text="t('loadingDetail')"></span>
+    </div>
+
+    <!-- Skill detail -->
+    <template x-if="selected && !detailLoading">
+      <div class="skill-detail skill-browser" x-cloak>
+        <aside class="associated-sidebar" x-show="selected.files && selected.files.length > 0">
+          <div class="associated-header">
+            <span x-text="t('associatedFiles')"></span>
+            <span class="count" x-text="selected.files.length"></span>
+          </div>
+          <div class="file-tree-panel browser-tree">
+            <template x-for="node in fileTree" :key="node.path || (node.name + node.depth)">
+              <div>
+                <template x-if="node.type === 'dir'">
+                  <div class="tree-dir" :style="'padding-left:' + (node.depth * 14 + 8) + 'px'" @click="toggleDir(node)">
+                    <svg class="tree-arrow" :class="{expanded: node.expanded}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    <svg class="tree-folder" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <span class="tree-name" x-text="node.name"></span>
+                  </div>
+                </template>
+                <template x-if="node.type === 'file'">
+                  <div class="tree-file" :class="{active: activeFilePath === node.path}" :style="'padding-left:' + (node.depth * 14 + 22) + 'px'" @click="openFileByPath(node.path)">
+                    <svg class="tree-file-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <span class="tree-name" x-text="node.name"></span>
+                    <span class="tree-size" x-text="formatSize(node.size)"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </aside>
+
+        <div class="detail-main-pane">
+          <div class="detail-header" x-show="!isViewingRegularFile()">
+            <div class="detail-title-row">
+              <div class="detail-dot" x-text="selected.name.charAt(0).toUpperCase()"></div>
+              <div style="flex:1">
+                <div class="detail-title-row-inner">
+                  <div class="detail-title" x-text="selected.name"></div>
+                  <button class="fav-btn" :class="{active: isFavorite(selected.name)}" @click="toggleFavorite(selected.name)" title="Toggle favorite">
+                    <span x-text="isFavorite(selected.name) ? '★' : '☆'"></span>
+                  </button>
+                </div>
+                <div class="detail-badges">
+                  <template x-if="selected.category"><span class="badge badge-category" x-text="selected.category"></span></template>
+                  <template x-if="selected.origin === 'package'"><span class="badge badge-package">Package</span></template>
+                  <template x-if="selected.origin !== 'package' && selected.source === 'auto'"><span class="badge badge-auto">Auto</span></template>
+                  <template x-if="selected.source === 'agent'"><span class="badge badge-agent" x-text="(selected.agent || 'agent') + ' agent'"></span></template>
+                  <template x-if="selected.scope === 'user'"><span class="badge badge-user" x-text="t('user')"></span></template>
+                  <template x-if="selected.scope === 'project'"><span class="badge badge-project" x-text="t('project')"></span></template>
+                  <template x-if="!selected.enabled"><span class="badge badge-off" x-text="t('disabled')"></span></template>
+                  <template x-if="selected.disableModelInvocation"><span class="badge badge-off">No Auto-invoke</span></template>
+                </div>
+              </div>
+            </div>
+            <div class="detail-desc" x-text="selected.description"></div>
+            <template x-if="selected.customDescription">
+              <div class="original-desc"><span x-text="t('originalDescription')"></span>: <span x-text="selected.originalDescription"></span></div>
+            </template>
+          </div>
+
+          <div class="section custom-meta-section" x-show="!isViewingRegularFile()">
+            <div class="section-title-row">
+              <div class="section-title" x-text="t('customMeta')"></div>
+              <div class="section-actions">
+                <button class="mini-btn" x-show="!editingMeta" @click="editingMeta = true" x-text="t('edit')"></button>
+                <button class="mini-btn primary" x-show="editingMeta" @click="saveMeta()" x-text="t('save')"></button>
+                <button class="mini-btn" x-show="editingMeta" @click="cancelMetaEdit()" x-text="t('cancel')"></button>
+              </div>
+            </div>
+            <template x-if="!editingMeta">
+              <div class="meta-note-grid">
+                <div><div class="meta-label" x-text="t('category')"></div><div class="meta-value" x-text="selected.category || '—'"></div></div>
+                <div><div class="meta-label" x-text="t('notes')"></div><div class="meta-value note-text" x-text="selected.notes || '—'"></div></div>
+              </div>
+            </template>
+            <template x-if="editingMeta">
+              <div class="meta-form">
+                <label><span x-text="t('customDescription')"></span><input type="text" x-model="metaDraft.customDescription" :placeholder="selected.originalDescription"></label>
+                <label><span x-text="t('category')"></span><input type="text" x-model="metaDraft.category" list="category-list"></label>
+                <datalist id="category-list"><template x-for="c in categories" :key="c"><option :value="c"></option></template></datalist>
+                <label><span x-text="t('notes')"></span><textarea x-model="metaDraft.notes" rows="4"></textarea></label>
+              </div>
+            </template>
+          </div>
+
+          <div class="section" x-show="!isViewingRegularFile()">
+            <div class="section-title" x-text="t('metadata')"></div>
+            <div class="meta-grid">
+              <div class="meta-card"><div class="meta-label" x-text="t('source')"></div><div class="meta-value" x-text="selected.origin === 'package' && selected.packageSource ? selected.packageSource : (selected.source === 'agent' ? selected.agent : selected.source)"></div></div>
+              <div class="meta-card"><div class="meta-label" x-text="t('scope')"></div><div class="meta-value" x-text="selected.scope"></div></div>
+              <div class="meta-card"><div class="meta-label" x-text="t('reads')"></div><div class="meta-value" x-text="selected.usageCount || 0"></div></div>
+              <div class="meta-card"><div class="meta-label" x-text="t('lastUsed')"></div><div class="meta-value" x-text="formatDate(selected.lastUsed)"></div></div>
+              <div class="meta-card"><div class="meta-label" x-text="t('filePath')"></div><div class="meta-value clickable" x-text="selected.filePath" @click="readFile(stripTilde(selected.filePath))"></div></div>
+              <div class="meta-card"><div class="meta-label" x-text="t('baseDir')"></div><div class="meta-value" x-text="selected.baseDir"></div></div>
+            </div>
+          </div>
+
+          <div class="section viewer-section" x-show="fileViewer.open">
+            <div class="viewer-inner standalone-viewer">
+              <div class="viewer-header">
+                <span class="viewer-path" x-text="fileViewer.path"></span>
+                <button class="viewer-close" @click="closeFileViewer()">✕</button>
+              </div>
+              <div class="viewer-content">
+                <template x-if="fileViewer.loading"><div class="loading" x-text="t('loading')"></div></template>
+                <template x-if="!fileViewer.loading && fileViewer.error"><pre class="viewer-error" x-text="'Error: ' + fileViewer.error"></pre></template>
+                <template x-if="!fileViewer.loading && !fileViewer.error"><pre class="code-view" x-html="renderHighlightedCode(fileViewer.content)"></pre></template>
+              </div>
+            </div>
+          </div>
+
+          <div class="section" x-show="!fileViewer.open || isViewingSkillFile()">
+            <div class="section-title" x-text="t('skillContent')"></div>
+            <div class="md-body" x-html="selected.body ? renderMarkdown(selected.body) : ''"></div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+  </main>
+</div>
+
+<script src="/app.js"></script>
+<script src="/alpine.min.js" defer></script>
+</body>
+</html>

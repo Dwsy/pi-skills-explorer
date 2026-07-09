@@ -1,0 +1,16 @@
+# Runtime data is stored in ~/.pi/show-skills, but keep local leftovers out of git.
+favorites.json
+usage.json
+skill-meta.json
+settings.json
+server.json
+extension.json
+standalone-cache/
+
+# Local backups / OS noise
+*.bak
+.DS_Store
+
+# Dependencies / logs
+node_modules/
+*.log

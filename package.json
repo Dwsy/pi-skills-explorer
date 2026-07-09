@@ -1,0 +1,23 @@
+{
+  "name": "pi-extension-show-skills",
+  "version": "0.1.0",
+  "description": "Pi Skills Explorer extension with web UI, metadata, usage stats, and bundled meta-management skill.",
+  "type": "module",
+  "keywords": ["pi", "pi-extension", "skills", "skills-explorer"],
+  "license": "MIT",
+  "pi": {
+    "extensions": ["."],
+    "skills": ["./skills"]
+  },
+  "scripts": {
+    "start": "node standalone.mjs",
+    "check": "node --check public/app.js && node --check show-skills-meta.mjs && node --check standalone.mjs"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "typescript": "latest"
+  }
+}
