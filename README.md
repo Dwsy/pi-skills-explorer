@@ -44,6 +44,12 @@ node standalone.mjs
 
 ### As a Pi package / extension
 
+Install from GitHub:
+
+```bash
+pi install git:github.com/Dwsy/pi-skills-explorer
+```
+
 This package exposes both an extension and a bundled skill through `package.json`:
 
 ```json
